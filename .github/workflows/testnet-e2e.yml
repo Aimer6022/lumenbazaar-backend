@@ -40,8 +40,20 @@ permissions:
   contents: read
 
 jobs:
+  malware-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout submitted commit without credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Scan for known malware indicators
+        run: node scripts/security/scan-malware.mjs
+
   security-check:
     name: Security Validation
+    needs: malware-scan
     runs-on: ubuntu-latest
     outputs:
       mode: ${{ steps.security.outputs.mode }}
@@ -106,9 +118,9 @@ jobs:
   smoke-tests:
     name: Smoke Mode (Read-Only)
     runs-on: ubuntu-latest
-    needs: security-check
+    needs: [malware-scan, security-check]
     # Always run smoke tests regardless of mode - provides baseline health check
-    if: always()
+    if: always() && needs.malware-scan.result == 'success'
 
     steps:
       - name: Checkout
@@ -156,12 +168,13 @@ jobs:
   full-e2e-tests:
     name: Full E2E Suite (With Settlement)
     runs-on: ubuntu-latest
-    needs: security-check
+    needs: [malware-scan, security-check]
     # Only run full e2e if:
     # 1. Security check determined it's safe (not fork PR)
     # 2. We have credentials
     # 3. Mode is 'full'
     if: |
+      needs.malware-scan.result == 'success' &&
       needs.security-check.outputs.safe-for-funded == 'true' &&
       needs.security-check.outputs.mode == 'full' &&
       secrets.CLIENT_PRIVATE_KEY != ''
@@ -247,8 +260,8 @@ jobs:
   report:
     name: E2E Execution Report
     runs-on: ubuntu-latest
-    needs: [security-check, smoke-tests, full-e2e-tests]
-    if: always()
+    needs: [malware-scan, security-check, smoke-tests, full-e2e-tests]
+    if: always() && needs.malware-scan.result == 'success'
 
     steps:
       - name: Download all evidence artifacts
@@ -281,20 +294,20 @@ jobs:
             const smoke = fs.existsSync('deployment-evidence/testnet-e2e-smoke-evidence/smoke-mode.json') 
               ? JSON.parse(fs.readFileSync('deployment-evidence/testnet-e2e-smoke-evidence/smoke-mode.json', 'utf8'))
               : null;
-            
+
             let comment = '## Testnet E2E Suite Results\n\n';
             comment += `**Security Mode**: ${{ needs.security-check.outputs.mode }}\n`;
             comment += `**Fork PR**: ${{ needs.security-check.outputs.fork-detected }}\n\n`;
-            
+
             if (smoke) {
               comment += '### Smoke Mode (Read-Only)\n';
               comment += `✅ Deployment Health: ${smoke.summary.deploymentHealthy ? 'PASS' : 'FAIL'}\n`;
               comment += `✅ API Reachable: ${smoke.summary.apiReachable ? 'PASS' : 'FAIL'}\n`;
               comment += `✅ MCP Healthy: ${smoke.summary.mcpHealthy ? 'PASS' : 'FAIL'}\n`;
             }
-            
+
             comment += '\n[View full evidence in GitHub Actions artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -305,8 +318,8 @@ jobs:
   summary:
     name: E2E Suite Summary
     runs-on: ubuntu-latest
-    needs: [security-check, smoke-tests]
-    if: always()
+    needs: [malware-scan, security-check, smoke-tests]
+    if: always() && needs.malware-scan.result == 'success'
 
     steps:
       - name: Security Summary
