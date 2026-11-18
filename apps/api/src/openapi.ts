@@ -15,6 +15,16 @@ type RouteContract = {
   responseMediaType?: string;
   /** Optional schema for a 503 Service Unavailable response (e.g. readiness endpoint). */
   degradedResponse?: SchemaObject;
+  /**
+   * Public catalog GET: the response carries a strong ETag derived from the
+   * representation and honours If-None-Match with a 304 (RFC 9110).
+   */
+  conditionalGet?: boolean;
+  /**
+   * Authorization-specific GET: the response varies by credentials, so it
+   * carries no shared validator and is marked private, no-store.
+   */
+  privateResponse?: boolean;
 };
 
 const jsonObject: SchemaObject = {
@@ -132,6 +142,48 @@ const rateLimitHeaders: Record<string, unknown> = {
     description:
       "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
     schema: { type: "integer", minimum: 1 }
+  }
+};
+
+const etagHeader: Record<string, unknown> = {
+  description:
+    "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+  schema: { type: "string" }
+};
+
+const publicCacheControlHeader: Record<string, unknown> = {
+  description:
+    "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+  schema: { type: "string" }
+};
+
+const privateCacheControlHeader: Record<string, unknown> = {
+  description:
+    "Cache-Control for an authorization-specific response: private, no-store. The response varies by credentials and must not be stored by shared caches.",
+  schema: { type: "string" }
+};
+
+const varyApiKeyHeader: Record<string, unknown> = {
+  description:
+    "Vary: X-Api-Key. The response depends on the seller API key presented, so caches must not share it across credentials.",
+  schema: { type: "string" }
+};
+
+const ifNoneMatchParameter: Record<string, unknown> = {
+  name: "If-None-Match",
+  in: "header",
+  required: false,
+  description:
+    'Conditional request (RFC 9110): one or more ETags, `*`, or a weak tag (`W/"..."`). When the current representation matches, the server returns 304 Not Modified with no body.',
+  schema: { type: "string" }
+};
+
+const notModifiedResponse: Record<string, unknown> = {
+  description:
+    "Not Modified. The representation has not changed since the ETag supplied in If-None-Match. The response has no body; ETag and Cache-Control are repeated.",
+  headers: {
+    etag: etagHeader,
+    "cache-control": publicCacheControlHeader
   }
 };
 
@@ -859,6 +911,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "listResources",
     summary: "List catalog resources.",
     tags: ["resources"],
+    conditionalGet: true,
     response: {
       type: "object",
       required: ["resources", "nextCursor"],
@@ -886,6 +939,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "getResource",
     summary: "Fetch a paid resource by ID.",
     tags: ["resources"],
+    conditionalGet: true,
     response: resource
   },
   {
@@ -911,6 +965,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "listResourceVersions",
     summary: "List the immutable version history of a resource.",
     tags: ["resources"],
+    privateResponse: true,
     response: resourceVersionList
   },
   {
@@ -919,6 +974,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "getResourceVersion",
     summary: "Fetch a specific historical version of a resource.",
     tags: ["resources"],
+    privateResponse: true,
     response: resourceVersion
   },
   {
@@ -936,6 +992,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "listSellerResources",
     summary: "List resources owned by a seller.",
     tags: ["resources"],
+    privateResponse: true,
     response: jsonObject
   },
   {
@@ -944,6 +1001,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "browseDiscoveryResources",
     summary: "Browse discoverable paid resources.",
     tags: ["discovery"],
+    conditionalGet: true,
     response: jsonObject
   },
   {
@@ -952,6 +1010,7 @@ export const apiRouteContracts: RouteContract[] = [
     operationId: "searchDiscoveryResources",
     summary: "Search paid resources by query and filters.",
     tags: ["discovery"],
+    conditionalGet: true,
     response: jsonObject
   },
   {
@@ -1041,10 +1100,20 @@ export function buildOpenApiSpec(
 
   for (const contract of apiRouteContracts) {
     const pathItem = (paths[contract.path] ??= {});
+    const responseHeaders: Record<string, unknown> = {
+      ...rateLimitHeaders,
+      ...(contract.conditionalGet === true
+        ? { etag: etagHeader, "cache-control": publicCacheControlHeader }
+        : {}),
+      ...(contract.privateResponse === true
+        ? { "cache-control": privateCacheControlHeader, vary: varyApiKeyHeader }
+        : {})
+    };
     pathItem[contract.method] = {
       operationId: contract.operationId,
       summary: contract.summary,
       tags: contract.tags,
+      ...(contract.conditionalGet === true ? { parameters: [ifNoneMatchParameter] } : {}),
       ...(contract.requestBody === undefined
         ? {}
         : {
@@ -1063,13 +1132,14 @@ export function buildOpenApiSpec(
             contract.responseMediaType === "text/event-stream"
               ? "Server-sent event stream"
               : "Successful response",
-          headers: rateLimitHeaders,
+          headers: responseHeaders,
           content: {
             [contract.responseMediaType ?? "application/json"]: {
               schema: contract.response
             }
           }
         },
+        ...(contract.conditionalGet === true ? { "304": notModifiedResponse } : {}),
         ...(contract.degradedResponse === undefined
           ? {}
           : {
@@ -1164,7 +1234,10 @@ export function buildOpenApiSpec(
         "X-RateLimit-Limit": rateLimitHeaders["x-ratelimit-limit"],
         "X-RateLimit-Remaining": rateLimitHeaders["x-ratelimit-remaining"],
         "X-RateLimit-Reset": rateLimitHeaders["x-ratelimit-reset"],
-        "Retry-After": rateLimitHeaders["retry-after"]
+        "Retry-After": rateLimitHeaders["retry-after"],
+        ETag: etagHeader,
+        "Cache-Control": publicCacheControlHeader,
+        Vary: varyApiKeyHeader
       }
     },
     "x-docs-consumption": {
@@ -1218,6 +1291,20 @@ export function renderOpenApiMarkdown(spec: ReturnType<typeof buildOpenApiSpec> 
   }
 
   lines.push(
+    "",
+    "## Conditional requests",
+    "",
+    "Public catalog reads (`GET /v1/resources`, `GET /v1/resources/{id}`, `GET /v1/discovery/resources`, " +
+      "`GET /v1/discovery/search`) return a strong `ETag` (SHA-256 of the canonical response body) and " +
+      "`Cache-Control: public, max-age=60`. Send the ETag back in `If-None-Match` (including `*` or a weak " +
+      '`W/"..."` tag, or several tags) and the server returns `304 Not Modified` with no body, repeating the ' +
+      "`ETag` and `Cache-Control` headers, when the representation is unchanged. The ETag changes whenever the " +
+      "represented data changes.",
+    "",
+    "Authorization-specific reads (`GET /v1/resources/{id}/versions`, " +
+      "`GET /v1/resources/{id}/versions/{version}`, `GET /v1/sellers/{sellerId}/resources`) carry no ETag " +
+      "and return `Cache-Control: private, no-store` with `Vary: X-Api-Key`, so shared caches never store or " +
+      "share a response that varies by credentials.",
     "",
     "## Docs Repo Consumption",
     "",

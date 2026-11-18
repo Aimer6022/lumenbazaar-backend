@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "description": "Facilitator, seller catalog, discovery, and conformance APIs for LumenBazaar.",
     "x-release": {
-      "commit": "737e891baa49e202a7f4f4d8424177f0c7b99c43",
+      "commit": "00df0aa35e915e2cdd55c41871b1676ab335b54c",
       "version": "0.1.0",
       "protocol": "stellar-x402",
       "x402Version": 2,
@@ -3882,6 +3882,15 @@
         "operationId": "listResources",
         "summary": "List catalog resources.",
         "tags": ["resources"],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "Conditional request (RFC 9110): one or more ETags, `*`, or a weak tag (`W/\"...\"`). When the current representation matches, the server returns 304 Not Modified with no body.",
+            "schema": { "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -3901,6 +3910,14 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
@@ -3959,6 +3976,19 @@
                     "nextCursor": { "type": ["string", "null"] }
                   }
                 }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified. The representation has not changed since the ETag supplied in If-None-Match. The response has no body; ETag and Cache-Control are repeated.",
+            "headers": {
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
               }
             }
           },
@@ -4259,6 +4289,15 @@
         "operationId": "getResource",
         "summary": "Fetch a paid resource by ID.",
         "tags": ["resources"],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "Conditional request (RFC 9110): one or more ETags, `*`, or a weak tag (`W/\"...\"`). When the current representation matches, the server returns 304 Not Modified with no body.",
+            "schema": { "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -4278,6 +4317,14 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
@@ -4323,6 +4370,19 @@
                     "updatedAt": { "type": "string", "format": "date-time" }
                   }
                 }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified. The representation has not changed since the ETag supplied in If-None-Match. The response has no body; ETag and Cache-Control are repeated.",
+            "headers": {
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
               }
             }
           },
@@ -4799,6 +4859,14 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "cache-control": {
+                "description": "Cache-Control for an authorization-specific response: private, no-store. The response varies by credentials and must not be stored by shared caches.",
+                "schema": { "type": "string" }
+              },
+              "vary": {
+                "description": "Vary: X-Api-Key. The response depends on the seller API key presented, so caches must not share it across credentials.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
@@ -4937,6 +5005,14 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "cache-control": {
+                "description": "Cache-Control for an authorization-specific response: private, no-store. The response varies by credentials and must not be stored by shared caches.",
+                "schema": { "type": "string" }
+              },
+              "vary": {
+                "description": "Vary: X-Api-Key. The response depends on the seller API key presented, so caches must not share it across credentials.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
@@ -5263,6 +5339,14 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "cache-control": {
+                "description": "Cache-Control for an authorization-specific response: private, no-store. The response varies by credentials and must not be stored by shared caches.",
+                "schema": { "type": "string" }
+              },
+              "vary": {
+                "description": "Vary: X-Api-Key. The response depends on the seller API key presented, so caches must not share it across credentials.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
@@ -5361,6 +5445,15 @@
         "operationId": "browseDiscoveryResources",
         "summary": "Browse discoverable paid resources.",
         "tags": ["discovery"],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "Conditional request (RFC 9110): one or more ETags, `*`, or a weak tag (`W/\"...\"`). When the current representation matches, the server returns 304 Not Modified with no body.",
+            "schema": { "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -5380,10 +5473,31 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
               "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+            }
+          },
+          "304": {
+            "description": "Not Modified. The representation has not changed since the ETag supplied in If-None-Match. The response has no body; ETag and Cache-Control are repeated.",
+            "headers": {
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
+              }
             }
           },
           "429": {
@@ -5478,6 +5592,15 @@
         "operationId": "searchDiscoveryResources",
         "summary": "Search paid resources by query and filters.",
         "tags": ["discovery"],
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "Conditional request (RFC 9110): one or more ETags, `*`, or a weak tag (`W/\"...\"`). When the current representation matches, the server returns 304 Not Modified with no body.",
+            "schema": { "type": "string" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -5497,10 +5620,31 @@
               "retry-after": {
                 "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
                 "schema": { "type": "integer", "minimum": 1 }
+              },
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
               }
             },
             "content": {
               "application/json": { "schema": { "type": "object", "additionalProperties": true } }
+            }
+          },
+          "304": {
+            "description": "Not Modified. The representation has not changed since the ETag supplied in If-None-Match. The response has no body; ETag and Cache-Control are repeated.",
+            "headers": {
+              "etag": {
+                "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+                "schema": { "type": "string" }
+              },
+              "cache-control": {
+                "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+                "schema": { "type": "string" }
+              }
             }
           },
           "429": {
@@ -6580,6 +6724,18 @@
       "Retry-After": {
         "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
         "schema": { "type": "integer", "minimum": 1 }
+      },
+      "ETag": {
+        "description": "Strong ETag for the response representation: SHA-256 of the canonical JSON body, quoted per RFC 9110. Changes whenever the represented data changes.",
+        "schema": { "type": "string" }
+      },
+      "Cache-Control": {
+        "description": "Cache-Control for a public catalog representation: public, max-age=60. Shared caches may store it for up to 60 seconds.",
+        "schema": { "type": "string" }
+      },
+      "Vary": {
+        "description": "Vary: X-Api-Key. The response depends on the seller API key presented, so caches must not share it across credentials.",
+        "schema": { "type": "string" }
       }
     }
   },
