@@ -82,13 +82,27 @@ const readinessResponse: SchemaObject = {
     environment: { type: "string", enum: ["local", "testnet", "staging", "mainnet"] },
     checks: {
       type: "object",
-      required: ["database", "redis", "stellarRpc", "horizon", "signer", "migrations", "assets"],
+      required: [
+        "database",
+        "redis",
+        "stellarRpc",
+        "horizon",
+        "signer",
+        "secretProviders",
+        "migrations",
+        "assets"
+      ],
       properties: {
         database: readinessCheck,
         redis: readinessCheck,
         stellarRpc: readinessCheck,
         horizon: readinessCheck,
         signer: readinessCheck,
+        secretProviders: {
+          ...readinessCheck,
+          description:
+            "Startup secret-provider health checks (facilitator signer, event-stream signing secret). `not_required` when no secret providers are configured; `unavailable` with a stable failure reason code when any configured provider failed its startup check."
+        },
         migrations: readinessCheck,
         assets: readinessCheck
       }

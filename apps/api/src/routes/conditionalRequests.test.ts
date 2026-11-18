@@ -104,7 +104,7 @@ describe("catalog conditional requests", () => {
 
   it("changes the ETag when the resource changes", async () => {
     const before = await app.inject({ method: "GET", url: `/v1/resources/${resourceId}` });
-    await store.updateResource(resourceId, { name: "Paid Weather API v2" });
+    await store.updateResource(resourceId, { name: "Paid Weather API v2" }, { expectedVersion: 1 });
 
     const after = await app.inject({ method: "GET", url: `/v1/resources/${resourceId}` });
 

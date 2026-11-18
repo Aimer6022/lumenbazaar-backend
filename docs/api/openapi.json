@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "description": "Facilitator, seller catalog, discovery, and conformance APIs for LumenBazaar.",
     "x-release": {
-      "commit": "00df0aa35e915e2cdd55c41871b1676ab335b54c",
+      "commit": "395f7f81994ad833f6e1c0ccdb6f22f7f8f71abd",
       "version": "0.1.0",
       "protocol": "stellar-x402",
       "x402Version": 2,
@@ -221,6 +221,7 @@
                         "stellarRpc",
                         "horizon",
                         "signer",
+                        "secretProviders",
                         "migrations",
                         "assets"
                       ],
@@ -349,6 +350,32 @@
                               "description": "Stable, generic reason code. Never includes raw error messages, hostnames, credentials, or stack traces."
                             }
                           }
+                        },
+                        "secretProviders": {
+                          "type": "object",
+                          "required": ["status"],
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "unavailable",
+                                "timeout",
+                                "not_configured",
+                                "not_required"
+                              ]
+                            },
+                            "latencyMs": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Elapsed probe time in ms. Omitted when status is not_required or not_configured."
+                            },
+                            "reason": {
+                              "type": "string",
+                              "description": "Stable, generic reason code. Never includes raw error messages, hostnames, credentials, or stack traces."
+                            }
+                          },
+                          "description": "Startup secret-provider health checks (facilitator signer, event-stream signing secret). `not_required` when no secret providers are configured; `unavailable` with a stable failure reason code when any configured provider failed its startup check."
                         },
                         "migrations": {
                           "type": "object",
@@ -481,6 +508,7 @@
                         "stellarRpc",
                         "horizon",
                         "signer",
+                        "secretProviders",
                         "migrations",
                         "assets"
                       ],
@@ -609,6 +637,32 @@
                               "description": "Stable, generic reason code. Never includes raw error messages, hostnames, credentials, or stack traces."
                             }
                           }
+                        },
+                        "secretProviders": {
+                          "type": "object",
+                          "required": ["status"],
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "unavailable",
+                                "timeout",
+                                "not_configured",
+                                "not_required"
+                              ]
+                            },
+                            "latencyMs": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "description": "Elapsed probe time in ms. Omitted when status is not_required or not_configured."
+                            },
+                            "reason": {
+                              "type": "string",
+                              "description": "Stable, generic reason code. Never includes raw error messages, hostnames, credentials, or stack traces."
+                            }
+                          },
+                          "description": "Startup secret-provider health checks (facilitator signer, event-stream signing secret). `not_required` when no secret providers are configured; `unavailable` with a stable failure reason code when any configured provider failed its startup check."
                         },
                         "migrations": {
                           "type": "object",
