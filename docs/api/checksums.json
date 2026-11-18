@@ -6,19 +6,19 @@
     "x402PackageVersion": "2.28.0"
   },
   "algorithm": "sha256",
-  "generatedAt": "2026-11-18T15:08:53.285Z",
+  "generatedAt": "2026-11-18T15:13:46.788Z",
   "artifacts": [
     {
       "name": "openapi.json",
       "path": "docs/api/openapi.json",
-      "checksum": "503a5477ce812337ce96da1bf374b7adb64c69802c45673d32cd9ba6baa5182e",
-      "bytes": 296741
+      "checksum": "53230550ae9d3ff97e2353b1ce780964d40aac9f13112236507d6efede9862a2",
+      "bytes": 298577
     },
     {
       "name": "openapi.md",
       "path": "docs/api/openapi.md",
-      "checksum": "6c4546c020b7181bfaa3acbf5c32578efd5576542324542aae298e1d1a0c12db",
-      "bytes": 8849
+      "checksum": "230e94cb8f6cfb8902357e68cfb63abb14b4757590e6f8a7c6da71ff567e9fb3",
+      "bytes": 12739
     },
     {
       "name": "conformance.json",

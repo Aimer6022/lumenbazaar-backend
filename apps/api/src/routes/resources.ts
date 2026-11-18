@@ -4,7 +4,7 @@ import { z } from "zod";
 import { type SellerApiKeyPrincipal } from "@lumenbazaar/shared";
 
 import { applyPrivateNoStore, sendConditionalGet } from "../http/conditional.js";
-import { parseBody, parseParams, parseQuery } from "../http/validation.js";
+import { parseBody, parseIfMatchHeader, parseParams, parseQuery } from "../http/validation.js";
 import { type ResourceService } from "../services/resources.js";
 
 export type ResourceRouteOptions = {
@@ -33,13 +33,16 @@ export function registerResourceRoutes(app: FastifyInstance, options: ResourceRo
     return options.resourceService.updateResource(
       params.id,
       parseBody(request, z.unknown()),
-      getSellerContext(request)
+      getSellerContext(request),
+      { expectedVersion: parseIfMatchHeader(request) }
     );
   });
 
   app.delete("/v1/resources/:id", async (request) => {
     const params = parseParams(request, z.object({ id: z.string().min(1) }));
-    return options.resourceService.deleteResource(params.id, getSellerContext(request));
+    return options.resourceService.deleteResource(params.id, getSellerContext(request), {
+      expectedVersion: parseIfMatchHeader(request)
+    });
   });
 
   // Authorization-specific: version history is owner-scoped when a seller
@@ -67,7 +70,8 @@ export function registerResourceRoutes(app: FastifyInstance, options: ResourceRo
     return options.resourceService.rollbackResource(
       params.id,
       params.version,
-      getSellerContext(request)
+      getSellerContext(request),
+      { expectedVersion: parseIfMatchHeader(request) }
     );
   });
 

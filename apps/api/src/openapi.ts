@@ -13,6 +13,13 @@ type RouteContract = {
   requestBodyRequired?: boolean;
   response: SchemaObject;
   responseMediaType?: string;
+  /** Optional operation parameters (e.g. headers) rendered into the spec. */
+  parameters?: Array<Record<string, unknown>>;
+  /**
+   * Set for mutations guarded by optimistic concurrency: documents the 409
+   * RESOURCE_VERSION_CONFLICT response for a stale expected version.
+   */
+  versionConflict?: boolean;
   /** Optional schema for a 503 Service Unavailable response (e.g. readiness endpoint). */
   degradedResponse?: SchemaObject;
   /**
@@ -247,6 +254,12 @@ const resource: SchemaObject = {
     outputSchema: jsonObject,
     extensions: jsonObject,
     status: { type: "string", enum: ["draft", "active", "inactive"] },
+    version: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+    },
     createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", format: "date-time" }
   }
@@ -269,6 +282,38 @@ const resourceVersionList: SchemaObject = {
   required: ["versions"],
   properties: {
     versions: { type: "array", items: resourceVersion }
+  }
+};
+
+/**
+ * Optimistic-concurrency precondition for resource mutations (issue #102).
+ * The caller sends the resource `version` it read; the mutation applies
+ * only while the stored version still matches. The same version may also be
+ * sent as the `version` field of an update body; the header wins if both
+ * are sent. A missing precondition is rejected; a stale one returns 409
+ * RESOURCE_VERSION_CONFLICT with expectedVersion and currentVersion.
+ */
+const ifMatchParameter: Record<string, unknown> = {
+  name: "If-Match",
+  in: "header",
+  required: true,
+  description:
+    'Expected current resource version, as a bare integer (If-Match: 3) or a quoted strong entity tag (If-Match: "3").',
+  schema: { type: "string", pattern: '^"?[1-9][0-9]*"?$' }
+};
+
+const updateResourceRequest: SchemaObject = {
+  type: "object",
+  description:
+    "Partial resource fields to update, plus the optimistic-concurrency precondition. Every field except version is optional; version is the expected current resource version and is required unless If-Match is sent.",
+  properties: {
+    ...(resource.properties as Record<string, unknown>),
+    version: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Expected current resource version. Required unless the If-Match header is sent; the header wins when both are sent."
+    }
   }
 };
 
@@ -946,17 +991,23 @@ export const apiRouteContracts: RouteContract[] = [
     method: "patch",
     path: "/v1/resources/{id}",
     operationId: "updateResource",
-    summary: "Update mutable paid resource fields.",
+    summary:
+      "Update mutable paid resource fields. Requires an optimistic-concurrency precondition: the version read, in the If-Match header or the version body field. A stale version returns 409 RESOURCE_VERSION_CONFLICT.",
     tags: ["resources"],
-    requestBody: resource,
+    parameters: [ifMatchParameter],
+    versionConflict: true,
+    requestBody: updateResourceRequest,
     response: resource
   },
   {
     method: "delete",
     path: "/v1/resources/{id}",
     operationId: "deleteResource",
-    summary: "Deactivate a paid resource.",
+    summary:
+      "Deactivate a paid resource. Requires an optimistic-concurrency precondition: the version read, in the If-Match header. A stale version returns 409 RESOURCE_VERSION_CONFLICT.",
     tags: ["resources"],
+    parameters: [ifMatchParameter],
+    versionConflict: true,
     response: resource
   },
   {
@@ -981,8 +1032,11 @@ export const apiRouteContracts: RouteContract[] = [
     method: "post",
     path: "/v1/resources/{id}/rollback",
     operationId: "rollbackResource",
-    summary: "Roll back a resource to a historical version, creating a new immutable version.",
+    summary:
+      "Roll back a resource to a historical version, creating a new immutable version. Requires an optimistic-concurrency precondition: the version read, in the If-Match header. A stale version returns 409 RESOURCE_VERSION_CONFLICT.",
     tags: ["resources"],
+    parameters: [ifMatchParameter],
+    versionConflict: true,
     requestBody: rollbackResourceRequest,
     response: rollbackResourceResponse
   },
@@ -1113,7 +1167,14 @@ export function buildOpenApiSpec(
       operationId: contract.operationId,
       summary: contract.summary,
       tags: contract.tags,
-      ...(contract.conditionalGet === true ? { parameters: [ifNoneMatchParameter] } : {}),
+      ...(contract.parameters === undefined && contract.conditionalGet !== true
+        ? {}
+        : {
+            parameters: [
+              ...(contract.parameters ?? []),
+              ...(contract.conditionalGet === true ? [ifNoneMatchParameter] : [])
+            ]
+          }),
       ...(contract.requestBody === undefined
         ? {}
         : {
@@ -1140,6 +1201,20 @@ export function buildOpenApiSpec(
           }
         },
         ...(contract.conditionalGet === true ? { "304": notModifiedResponse } : {}),
+        ...(contract.versionConflict === undefined
+          ? {}
+          : {
+              "409": {
+                description:
+                  "Version conflict. The resource was modified by another writer after the version the caller read. The error body uses code RESOURCE_VERSION_CONFLICT and carries expectedVersion and currentVersion in details; re-read the resource and retry with the current version.",
+                headers: rateLimitHeaders,
+                content: {
+                  "application/json": {
+                    schema: errorResponse
+                  }
+                }
+              }
+            }),
         ...(contract.degradedResponse === undefined
           ? {}
           : {

@@ -3968,6 +3968,11 @@
                           "outputSchema": { "type": "object", "additionalProperties": true },
                           "extensions": { "type": "object", "additionalProperties": true },
                           "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                          },
                           "createdAt": { "type": "string", "format": "date-time" },
                           "updatedAt": { "type": "string", "format": "date-time" }
                         }
@@ -4123,6 +4128,11 @@
                   "outputSchema": { "type": "object", "additionalProperties": true },
                   "extensions": { "type": "object", "additionalProperties": true },
                   "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                  },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "updatedAt": { "type": "string", "format": "date-time" }
                 }
@@ -4190,6 +4200,11 @@
                     "outputSchema": { "type": "object", "additionalProperties": true },
                     "extensions": { "type": "object", "additionalProperties": true },
                     "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
                   }
@@ -4366,6 +4381,11 @@
                     "outputSchema": { "type": "object", "additionalProperties": true },
                     "extensions": { "type": "object", "additionalProperties": true },
                     "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
                   }
@@ -4474,32 +4494,24 @@
       },
       "patch": {
         "operationId": "updateResource",
-        "summary": "Update mutable paid resource fields.",
+        "summary": "Update mutable paid resource fields. Requires an optimistic-concurrency precondition: the version read, in the If-Match header or the version body field. A stale version returns 409 RESOURCE_VERSION_CONFLICT.",
         "tags": ["resources"],
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Expected current resource version, as a bare integer (If-Match: 3) or a quoted strong entity tag (If-Match: \"3\").",
+            "schema": { "type": "string", "pattern": "^\"?[1-9][0-9]*\"?$" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "id",
-                  "sellerId",
-                  "type",
-                  "name",
-                  "description",
-                  "url",
-                  "routeTemplate",
-                  "network",
-                  "payTo",
-                  "assetCode",
-                  "assetIssuer",
-                  "amount",
-                  "inputSchema",
-                  "outputSchema",
-                  "extensions",
-                  "status"
-                ],
+                "description": "Partial resource fields to update, plus the optimistic-concurrency precondition. Every field except version is optional; version is the expected current resource version and is required unless If-Match is sent.",
                 "properties": {
                   "id": { "type": "string" },
                   "sellerId": { "type": "string" },
@@ -4517,6 +4529,11 @@
                   "outputSchema": { "type": "object", "additionalProperties": true },
                   "extensions": { "type": "object", "additionalProperties": true },
                   "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Expected current resource version. Required unless the If-Match header is sent; the header wins when both are sent."
+                  },
                   "createdAt": { "type": "string", "format": "date-time" },
                   "updatedAt": { "type": "string", "format": "date-time" }
                 }
@@ -4584,8 +4601,55 @@
                     "outputSchema": { "type": "object", "additionalProperties": true },
                     "extensions": { "type": "object", "additionalProperties": true },
                     "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict. The resource was modified by another writer after the version the caller read. The error body uses code RESOURCE_VERSION_CONFLICT and carries expectedVersion and currentVersion in details; re-read the resource and retry with the current version.",
+            "headers": {
+              "x-ratelimit-limit": {
+                "description": "Maximum number of requests allowed in the current rate limit window.",
+                "schema": { "type": "integer" }
+              },
+              "x-ratelimit-remaining": {
+                "description": "Number of requests remaining in the current rate limit window. Zero means limit reached.",
+                "schema": { "type": "integer" }
+              },
+              "x-ratelimit-reset": {
+                "description": "ISO 8601 timestamp when the current rate limit window resets.",
+                "schema": { "type": "string", "format": "date-time" }
+              },
+              "retry-after": {
+                "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
+                "schema": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -4679,8 +4743,17 @@
       },
       "delete": {
         "operationId": "deleteResource",
-        "summary": "Deactivate a paid resource.",
+        "summary": "Deactivate a paid resource. Requires an optimistic-concurrency precondition: the version read, in the If-Match header. A stale version returns 409 RESOURCE_VERSION_CONFLICT.",
         "tags": ["resources"],
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Expected current resource version, as a bare integer (If-Match: 3) or a quoted strong entity tag (If-Match: \"3\").",
+            "schema": { "type": "string", "pattern": "^\"?[1-9][0-9]*\"?$" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",
@@ -4741,8 +4814,55 @@
                     "outputSchema": { "type": "object", "additionalProperties": true },
                     "extensions": { "type": "object", "additionalProperties": true },
                     "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict. The resource was modified by another writer after the version the caller read. The error body uses code RESOURCE_VERSION_CONFLICT and carries expectedVersion and currentVersion in details; re-read the resource and retry with the current version.",
+            "headers": {
+              "x-ratelimit-limit": {
+                "description": "Maximum number of requests allowed in the current rate limit window.",
+                "schema": { "type": "integer" }
+              },
+              "x-ratelimit-remaining": {
+                "description": "Number of requests remaining in the current rate limit window. Zero means limit reached.",
+                "schema": { "type": "integer" }
+              },
+              "x-ratelimit-reset": {
+                "description": "ISO 8601 timestamp when the current rate limit window resets.",
+                "schema": { "type": "string", "format": "date-time" }
+              },
+              "retry-after": {
+                "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
+                "schema": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
                   }
                 }
               }
@@ -5121,8 +5241,17 @@
     "/v1/resources/{id}/rollback": {
       "post": {
         "operationId": "rollbackResource",
-        "summary": "Roll back a resource to a historical version, creating a new immutable version.",
+        "summary": "Roll back a resource to a historical version, creating a new immutable version. Requires an optimistic-concurrency precondition: the version read, in the If-Match header. A stale version returns 409 RESOURCE_VERSION_CONFLICT.",
         "tags": ["resources"],
+        "parameters": [
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Expected current resource version, as a bare integer (If-Match: 3) or a quoted strong entity tag (If-Match: \"3\").",
+            "schema": { "type": "string", "pattern": "^\"?[1-9][0-9]*\"?$" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5208,6 +5337,11 @@
                         "outputSchema": { "type": "object", "additionalProperties": true },
                         "extensions": { "type": "object", "additionalProperties": true },
                         "status": { "type": "string", "enum": ["draft", "active", "inactive"] },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "description": "Optimistic-concurrency version. Starts at 1 and increments atomically on every update, delete, or rollback. Mutations must supply the version they read, in the If-Match header or the version request field; a stale version is rejected with 409 RESOURCE_VERSION_CONFLICT."
+                        },
                         "createdAt": { "type": "string", "format": "date-time" },
                         "updatedAt": { "type": "string", "format": "date-time" }
                       }
@@ -5223,6 +5357,48 @@
                         "createdAt": { "type": "string", "format": "date-time" }
                       }
                     }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict. The resource was modified by another writer after the version the caller read. The error body uses code RESOURCE_VERSION_CONFLICT and carries expectedVersion and currentVersion in details; re-read the resource and retry with the current version.",
+            "headers": {
+              "x-ratelimit-limit": {
+                "description": "Maximum number of requests allowed in the current rate limit window.",
+                "schema": { "type": "integer" }
+              },
+              "x-ratelimit-remaining": {
+                "description": "Number of requests remaining in the current rate limit window. Zero means limit reached.",
+                "schema": { "type": "integer" }
+              },
+              "x-ratelimit-reset": {
+                "description": "ISO 8601 timestamp when the current rate limit window resets.",
+                "schema": { "type": "string", "format": "date-time" }
+              },
+              "retry-after": {
+                "description": "Number of seconds to wait before retrying. Only present in 429 responses. Per RFC 6585.",
+                "schema": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok", "error"],
+                  "properties": {
+                    "ok": { "type": "boolean", "enum": [false] },
+                    "error": {
+                      "type": "object",
+                      "required": ["code", "message"],
+                      "properties": {
+                        "code": { "type": "string" },
+                        "message": { "type": "string" },
+                        "details": { "type": "object", "additionalProperties": true }
+                      }
+                    },
+                    "requestId": { "type": "string" }
                   }
                 }
               }
